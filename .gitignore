@@ -26,6 +26,9 @@ hs_err_pid*
 # intellij files
 **/.idea/
 .idea/
+*.iml
+
+.DS_Store
 
 # maven
 target/
