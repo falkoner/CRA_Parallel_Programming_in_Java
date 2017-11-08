@@ -106,13 +106,10 @@ public final class OneDimAveragingPhaser {
      * @param tasks The number of threads/tasks to use to compute the solution
      */
     public static void runParallelFuzzyBarrier(final int iterations,
-            final double[] myNew, final double[] myVal, final int n,
-            final int tasks) {
-
-        Phaser[] phs = new Phaser[tasks];
-        for(int i=0;i<phs.length;i++){
-            phs[i] = new Phaser(1);
-        }
+                                               final double[] myNew, final double[] myVal, final int n,
+                                               final int tasks) {
+        Phaser ph = new Phaser(0);
+        ph.bulkRegister(tasks);
 
         Thread[] threads = new Thread[tasks];
 
@@ -125,22 +122,16 @@ public final class OneDimAveragingPhaser {
 
                 for (int iter = 0; iter < iterations; iter++) {
                     final int left = i * (n / tasks) + 1;
-                    final int right = (i + 1) * (n / tasks);
+                    threadPrivateMyNew[left] = (threadPrivateMyVal[left-1] + threadPrivateMyVal[left+1]) / 2.0;
 
-                    for (int j = left; j <= right; j++) {
-                        threadPrivateMyNew[j] = (threadPrivateMyVal[j - 1]
-                                + threadPrivateMyVal[j + 1]) / 2.0;
+                    final int right = (i + 1) * (n / tasks);
+                    threadPrivateMyNew[right] = (threadPrivateMyVal[right-1] + threadPrivateMyVal[right+1]) / 2.0;
+
+                    int currentPhase = ph.arrive();
+                    for (int j = left + 1; j <= right - 1; j++) {
+                        threadPrivateMyNew[j] = (threadPrivateMyVal[j - 1] + threadPrivateMyVal[j + 1]) / 2.0;
                     }
-//                    System.out.println("Arriving task: "+ i);
-                    phs[i].arrive();
-                    if(i-1>=0){
-//                        System.out.println("Arrived task "+ i +" Waiting for "+ (i-1));
-                        phs[i-1].awaitAdvance(1);
-                    }
-                    if(i+1<tasks){
-//                        System.out.println("Arrived task "+ i +" Waiting for "+ (i+1));
-                        phs[i+1].awaitAdvance(1);
-                    }
+                    ph.awaitAdvance(currentPhase);
 
                     double[] temp = threadPrivateMyNew;
                     threadPrivateMyNew = threadPrivateMyVal;
